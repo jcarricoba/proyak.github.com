@@ -283,6 +283,7 @@ a { color: var(--primary); }
       <polyline points="3,26 7,18 12,22 16,14 20,20 24,16 29,26" stroke="white" stroke-width="0.8" fill="none" opacity="0.4"/>
     </svg>
     Proyak
+    <span id="version-label" style="font-size:10px;font-weight:400;color:rgba(255,255,255,.35);letter-spacing:0"></span>
   </div>
   <div class="workspace-badge" onclick="editWorkspace()">
     ✏ <input class="workspace-edit" id="ws-name" value="Mi Área" onchange="saveWsName()" onclick="event.stopPropagation()">
@@ -872,7 +873,8 @@ a { color: var(--primary); }
 // ============================================================
 // DATA MODEL
 // ============================================================
-const VERSION = '1.1';
+const VERSION = '1.2';
+const VERSION_DATE = '10/04/2026';
 
 const ESTADOS = {
   verde:    { label: '🟢 Dentro del plan', dot: 'verde', cls: 'sl-verde' },
@@ -2376,6 +2378,7 @@ function addPerfil() {
 // ============================================================
 // BOOT
 // ============================================================
+document.getElementById('version-label').textContent = 'v' + VERSION + ' · ' + VERSION_DATE;
 loadData();
 renderAll();
 if(DB.cloudKey) setCloudBar('ok', '☁ Nube conectada');
