@@ -302,6 +302,23 @@ a { color: var(--primary); }
 .help-badge.amarillo { background:rgba(234,179,8,.2); color:#facc15; }
 .help-badge.naranja { background:rgba(249,115,22,.2); color:#fb923c; }
 .help-badge.rojo { background:rgba(239,68,68,.2); color:#f87171; }
+
+/* ===== ANALISIS ===== */
+.anal-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+.anal-card { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); padding: 16px 18px; }
+.anal-card h3 { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin-bottom: 12px; }
+.anal-bars { display: flex; flex-direction: column; gap: 8px; }
+.anal-bar-row { display: grid; grid-template-columns: 190px 1fr 70px; gap: 8px; align-items: center; }
+.anal-bar-info { min-width: 0; overflow: hidden; }
+.anal-code { font-size: 10px; font-weight: 700; color: var(--primary); font-family: monospace; background: rgba(96,165,250,.12); padding: 1px 5px; border-radius: 3px; margin-right: 4px; white-space: nowrap; }
+.anal-code.linked { background: rgba(74,222,128,.12); color: var(--success); }
+.anal-sub { font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
+.anal-track { height: 8px; border-radius: 4px; background: rgba(255,255,255,.06); overflow: hidden; }
+.anal-fill { height: 100%; border-radius: 4px; background: var(--primary); }
+.anal-fill-cons { background: var(--success); }
+.anal-fill-mes { background: var(--orange); }
+.anal-val { font-size: 11px; color: var(--muted); font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
+.anal-filter-bar { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); padding: 10px 14px; margin-bottom: 12px; display: flex; gap: 10px; align-items: center; }
 </style>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 </head>
@@ -355,6 +372,7 @@ a { color: var(--primary); }
   <div class="tab" id="tab-preventa" onclick="showTab('preventa')">🎯 Preventa</div>
   <div class="tab" id="tab-historico" onclick="showTab('historico')">📦 Histórico</div>
   <div class="tab" id="tab-partes" onclick="showTab('partes')">📋 Partes</div>
+  <div class="tab" id="tab-analisis" onclick="showTab('analisis')">📈 Análisis</div>
 </div>
 
 <!-- MAIN -->
@@ -459,6 +477,33 @@ a { color: var(--primary); }
         <div style="font-size:48px;margin-bottom:12px">📊</div>
         <p>Importa un Excel de partes de trabajo para ver el informe visual</p>
         <p style="font-size:12px;color:var(--muted)">Cada hoja del Excel debe corresponder a un codigo de proyecto (ej. PRO-0145-01)</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== ANÁLISIS DE HORAS ===== -->
+  <div id="view-analisis" class="hidden">
+    <div class="partes-header">
+      <h2>📈 Análisis de horas</h2>
+      <button class="btn btn-primary" onclick="document.getElementById('analisis-file-input').click()">📥 Importar Excel</button>
+      <input type="file" id="analisis-file-input" accept=".xlsx" multiple style="display:none" onchange="importPartes(this)">
+      <span id="analisis-filename" style="font-size:12px;color:var(--muted)"></span>
+    </div>
+    <div class="kpi-row" id="analisis-kpi-area" style="grid-template-columns:repeat(5,1fr)"></div>
+    <div class="anal-filter-bar" id="analisis-filter-bar" style="display:none">
+      <select id="anal-mes" onchange="renderAnalisis()" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--bg);color:var(--text);outline:none">
+        <option value="">Todos los meses</option>
+      </select>
+      <select id="anal-cons" onchange="renderAnalisis()" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--bg);color:var(--text);outline:none">
+        <option value="">Todos los consultores</option>
+      </select>
+      <button class="btn btn-secondary btn-sm" onclick="document.getElementById('anal-mes').value='';document.getElementById('anal-cons').value='';renderAnalisis()">✕ Limpiar</button>
+    </div>
+    <div id="analisis-content">
+      <div class="partes-empty">
+        <div style="font-size:48px;margin-bottom:12px">📈</div>
+        <p>Importa un Excel de partes de trabajo para ver el análisis de horas</p>
+        <p style="font-size:12px;color:var(--muted)">Usa el mismo Excel que en la pestaña Partes, o importa directamente aquí</p>
       </div>
     </div>
   </div>
@@ -1456,7 +1501,7 @@ function renderTable() {
           <span style="font-size:11px;font-weight:700;color:var(--muted)">${prog}%</span>
         </div>
       </td>
-      <td class="jorn-cell"><span class="jorn-est">${dispEst}</span> <span class="jorn-pct">(${jPct})</span>${fromPartes ? '<span class="partes-icon" title="Horas desde partes de trabajo">📋</span>' : ''}</td>
+      <td class="jorn-cell">${jCons > 0 ? `<span class="jorn-est">${dispCons}</span> / ` : ''}<span class="jorn-est">${dispEst}</span>${fromPartes ? '<span class="partes-icon" title="Horas desde partes de trabajo">📋</span>' : ''}</td>
       <td style="font-size:12px;font-weight:700;line-height:1.6">${econVal}</td>
       <td style="white-space:nowrap">${urlLinks||'<span style="color:var(--light);font-size:11px">–</span>'}</td>
       <td><div class="resp-badge" title="${escH(p.responsable||'')}">${escH(respInitials)}</div></td>
@@ -1928,13 +1973,14 @@ function saveConversion() {
 // UI HELPERS
 // ============================================================
 function showTab(tab) {
-  ['portfolio','preventa','historico','partes'].forEach(t=>{
+  ['portfolio','preventa','historico','partes','analisis'].forEach(t=>{
     document.getElementById('view-'+t).classList.toggle('hidden',t!==tab);
     document.getElementById('tab-'+t).classList.toggle('active',t===tab);
   });
   if(tab==='preventa') renderPreventa();
   else if(tab==='historico') renderHistorico();
   else if(tab==='partes') renderPartes();
+  else if(tab==='analisis') renderAnalisis();
   else renderTable();
 }
 
@@ -2442,6 +2488,7 @@ async function importPartes(input) {
     localStorage.setItem('proyak_partes', JSON.stringify({ data: partesData, file: label, date: new Date().toISOString() }));
     document.getElementById('partes-filename').textContent = label;
     renderPartes();
+    renderAnalisis();
     renderTable();
     renderKPIs();
     showToast(`✅ ${nProyectos} proyecto(s) de ${files.length} fichero(s)`);
@@ -2501,6 +2548,156 @@ function renderPartes() {
 }
 
 // ============================================================
+// RENDER: ANÁLISIS DE HORAS
+// ============================================================
+function renderAnalisis() {
+  const container = document.getElementById('analisis-content');
+  const kpiArea = document.getElementById('analisis-kpi-area');
+  const filterBar = document.getElementById('analisis-filter-bar');
+  const filenameEl = document.getElementById('analisis-filename');
+  const codes = Object.keys(partesData);
+
+  // Sync filename label with partes tab
+  const partesFilename = document.getElementById('partes-filename').textContent;
+  if(filenameEl && partesFilename) filenameEl.textContent = partesFilename;
+
+  if(!codes.length) {
+    kpiArea.innerHTML = '';
+    filterBar.style.display = 'none';
+    container.innerHTML = `<div class="partes-empty"><div style="font-size:48px;margin-bottom:12px">📈</div><p>Importa un Excel de partes de trabajo para ver el análisis de horas</p><p style="font-size:12px;color:var(--muted)">Usa el mismo Excel que en la pestaña Partes, o importa directamente aquí</p></div>`;
+    return;
+  }
+  filterBar.style.display = 'flex';
+
+  const hpj = DB.horasPorJornada || 8;
+  const unidad = DB.unidad || 'jornadas';
+  const dispH = h => unidad === 'horas' ? `${h.toFixed(0)}h` : `${(h/hpj).toFixed(1)} J`;
+
+  // Flatten all entries
+  const allEntries = codes.flatMap(code =>
+    partesData[code].entries.map(e => ({ ...e, code, nombre: partesData[code].nombre }))
+  );
+
+  // Parse month label from fecha string (dd/mm/yyyy)
+  const MESES_SHORT = ['','ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  function entryMes(e) {
+    if(!e.fecha) return 'Sin fecha';
+    const parts = e.fecha.split('/');
+    if(parts.length >= 3) {
+      const m = parseInt(parts[1]);
+      const y = String(parts[2]).slice(0,4);
+      return `${y}-${String(m).padStart(2,'0')} (${MESES_SHORT[m]||parts[1]} ${y})`;
+    }
+    return e.fecha;
+  }
+
+  // Populate month select (preserve current value)
+  const mesEl = document.getElementById('anal-mes');
+  const savedMes = mesEl.value;
+  const allMonths = [...new Set(allEntries.map(entryMes).filter(m=>m!=='Sin fecha'))].sort();
+  mesEl.innerHTML = '<option value="">Todos los meses</option>' + allMonths.map(m=>`<option value="${m}">${m.replace(/^\d{4}-\d{2} \(/,'').replace(/\)$/,'')}</option>`).join('');
+  // restore by matching value or closest
+  if(allMonths.includes(savedMes)) mesEl.value = savedMes;
+
+  // Populate consultant select (preserve current value)
+  const consEl = document.getElementById('anal-cons');
+  const savedCons = consEl.value;
+  const allCons = [...new Set(allEntries.map(e=>e.consultor).filter(Boolean))].sort();
+  consEl.innerHTML = '<option value="">Todos los consultores</option>' + allCons.map(c=>`<option value="${escH(c)}">${escH(c)}</option>`).join('');
+  if(allCons.includes(savedCons)) consEl.value = savedCons;
+
+  // Filter
+  const mesFilter = mesEl.value;
+  const consFilter = consEl.value;
+  const filtered = allEntries.filter(e => {
+    if(mesFilter && entryMes(e) !== mesFilter) return false;
+    if(consFilter && e.consultor !== consFilter) return false;
+    return true;
+  });
+
+  // KPIs
+  const linkedCodes = new Set(DB.projects.map(p=>p.codigoProyecto).filter(Boolean).map(c=>c.trim().toUpperCase()));
+  const totalH = filtered.reduce((s,e)=>s+(e.cantidad||0),0);
+  const clientH = filtered.filter(e=>linkedCodes.has(e.code)).reduce((s,e)=>s+(e.cantidad||0),0);
+  const internalH = totalH - clientH;
+  const activeCons = new Set(filtered.map(e=>e.consultor).filter(Boolean)).size;
+  const activeProj = new Set(filtered.map(e=>e.code)).size;
+  const clientPct = totalH > 0 ? Math.round(clientH/totalH*100) : 0;
+
+  kpiArea.innerHTML = `
+    <div class="kpi"><div class="kpi-icon">⏱</div><div><div class="kpi-label">Total horas</div><div class="kpi-value">${dispH(totalH)}</div><div class="kpi-sub">${filtered.length} registros</div></div></div>
+    <div class="kpi"><div class="kpi-icon">👔</div><div><div class="kpi-label">Horas cliente</div><div class="kpi-value" style="color:var(--success)">${dispH(clientH)}</div><div class="kpi-sub">${clientPct}% del total</div></div></div>
+    <div class="kpi"><div class="kpi-icon">🏠</div><div><div class="kpi-label">Horas internas</div><div class="kpi-value" style="color:var(--warning)">${dispH(internalH)}</div><div class="kpi-sub">${100-clientPct}% del total</div></div></div>
+    <div class="kpi"><div class="kpi-icon">👥</div><div><div class="kpi-label">Consultores</div><div class="kpi-value">${activeCons}</div><div class="kpi-sub">Con horas registradas</div></div></div>
+    <div class="kpi"><div class="kpi-icon">📁</div><div><div class="kpi-label">Proyectos</div><div class="kpi-value">${activeProj}</div><div class="kpi-sub">${[...new Set(filtered.map(e=>e.code))].filter(c=>linkedCodes.has(c)).length} vinculados al portfolio</div></div></div>`;
+
+  // Aggregate by project
+  const byProj = {};
+  filtered.forEach(e => {
+    if(!byProj[e.code]) byProj[e.code] = { h:0, nombre: e.nombre };
+    byProj[e.code].h += e.cantidad||0;
+  });
+  const projList = Object.entries(byProj).sort((a,b)=>b[1].h-a[1].h);
+  const maxProjH = projList.length ? projList[0][1].h : 1;
+
+  // Aggregate by consultant
+  const byCons = {};
+  filtered.forEach(e => { if(e.consultor) byCons[e.consultor]=(byCons[e.consultor]||0)+(e.cantidad||0); });
+  const consList = Object.entries(byCons).sort((a,b)=>b[1]-a[1]);
+  const maxConsH = consList.length ? consList[0][1] : 1;
+
+  // Aggregate by month
+  const byMes = {};
+  filtered.forEach(e => { const m=entryMes(e); byMes[m]=(byMes[m]||0)+(e.cantidad||0); });
+  const mesList = Object.entries(byMes).filter(([m])=>m!=='Sin fecha').sort((a,b)=>a[0].localeCompare(b[0]));
+  const maxMesH = mesList.length ? Math.max(...mesList.map(([,h])=>h)) : 1;
+
+  const projBars = projList.slice(0,12).map(([code,{h,nombre}]) => {
+    const linked = linkedCodes.has(code);
+    const proj = DB.projects.find(p=>p.codigoProyecto?.trim().toUpperCase()===code);
+    const sub = proj ? `${escH(proj.cliente)} · ${escH(proj.nombre)}` : escH(nombre||code);
+    return `<div class="anal-bar-row">
+      <div class="anal-bar-info"><span class="anal-code ${linked?'linked':''}">${escH(code)}</span><span class="anal-sub">${sub}</span></div>
+      <div class="anal-track"><div class="anal-fill" style="width:${(h/maxProjH*100).toFixed(0)}%"></div></div>
+      <span class="anal-val">${dispH(h)}</span>
+    </div>`;
+  }).join('');
+
+  const consBars = consList.slice(0,12).map(([cons,h]) =>
+    `<div class="anal-bar-row">
+      <div class="anal-bar-info"><span style="font-size:12px;font-weight:600">${escH(cons)}</span></div>
+      <div class="anal-track"><div class="anal-fill anal-fill-cons" style="width:${(h/maxConsH*100).toFixed(0)}%"></div></div>
+      <span class="anal-val">${dispH(h)}</span>
+    </div>`
+  ).join('');
+
+  const mesBars = mesList.map(([mes,h]) => {
+    const label = mes.replace(/^\d{4}-\d{2} \(/,'').replace(/\)$/,'');
+    return `<div class="anal-bar-row">
+      <div class="anal-bar-info"><span style="font-size:12px;font-weight:600">${escH(label)}</span></div>
+      <div class="anal-track"><div class="anal-fill anal-fill-mes" style="width:${(h/maxMesH*100).toFixed(0)}%"></div></div>
+      <span class="anal-val">${dispH(h)}</span>
+    </div>`;
+  }).join('');
+
+  container.innerHTML = `
+    <div class="anal-layout">
+      <div class="anal-card">
+        <h3>Top proyectos</h3>
+        <div class="anal-bars">${projBars||'<span style="color:var(--muted);font-size:12px">Sin datos</span>'}</div>
+      </div>
+      <div class="anal-card">
+        <h3>Top consultores</h3>
+        <div class="anal-bars">${consBars||'<span style="color:var(--muted);font-size:12px">Sin datos</span>'}</div>
+      </div>
+    </div>
+    ${mesList.length > 1 ? `<div class="anal-card" style="margin-bottom:16px">
+      <h3>Distribución por mes</h3>
+      <div class="anal-bars" style="gap:6px">${mesBars}</div>
+    </div>` : ''}`;
+}
+
+// ============================================================
 // UNIT TOGGLE + ECONOMIC HELPERS
 // ============================================================
 function toggleUnidad() {
@@ -2512,6 +2709,7 @@ function toggleUnidad() {
   if(th) th.textContent = DB.unidad==='horas' ? 'Horas' : 'Jornadas';
   renderKPIs();
   renderTable();
+  renderAnalisis();
 }
 
 // ============================================================
