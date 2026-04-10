@@ -266,7 +266,44 @@ a { color: var(--primary); }
 .alert-icon:hover .alert-tip { display: block; }
 .alert-critica { color: var(--danger); }
 .alert-media { color: var(--warning); }
+
+/* ===== PARTES DE TRABAJO ===== */
+.partes-header { display:flex; align-items:center; gap:12px; margin-bottom:20px; }
+.partes-header h2 { margin:0; font-size:16px; font-weight:800; }
+.partes-project-card { background:var(--surface); border-radius:var(--radius); box-shadow:var(--shadow); margin-bottom:16px; overflow:hidden; }
+.partes-card-header { padding:14px 18px; display:flex; align-items:center; gap:12px; border-bottom:1px solid var(--border); }
+.partes-code { font-size:11px; font-weight:700; color:var(--primary); font-family:monospace; background:rgba(96,165,250,.12); padding:3px 8px; border-radius:4px; flex-shrink:0; }
+.partes-linked { font-size:11px; color:var(--success); }
+.partes-total { margin-left:auto; font-size:18px; font-weight:800; text-align:right; white-space:nowrap; }
+.partes-card-body { padding:14px 18px; }
+.partes-consultor-bar { display:flex; align-items:center; gap:8px; margin-bottom:8px; font-size:12px; }
+.partes-bar-bg { flex:1; height:8px; background:rgba(255,255,255,.08); border-radius:4px; overflow:hidden; }
+.partes-bar-fill { height:100%; background:var(--primary); border-radius:4px; }
+.partes-icon { font-size:10px; color:var(--primary); vertical-align:middle; margin-left:3px; cursor:default; }
+.partes-empty { text-align:center; padding:60px 20px; color:var(--muted); }
+.partes-upload-zone { border:2px dashed var(--border); border-radius:12px; padding:40px; text-align:center; margin-bottom:24px; cursor:pointer; transition:border-color .2s; }
+.partes-upload-zone:hover { border-color:var(--primary); }
+.partes-pct { font-size:12px; margin-left:8px; }
+
+/* ===== HELP MODAL ===== */
+.help-modal { max-width:680px; width:96vw; max-height:88vh; display:flex; flex-direction:column; }
+.help-body { overflow-y:auto; padding:0 28px 24px; flex:1; }
+.help-section { margin-bottom:28px; }
+.help-section h3 { font-size:13px; font-weight:800; text-transform:uppercase; letter-spacing:.06em; color:var(--primary); margin:0 0 12px; padding-bottom:6px; border-bottom:1px solid var(--border); }
+.help-step { display:flex; gap:12px; margin-bottom:10px; font-size:13px; line-height:1.6; }
+.help-num { flex-shrink:0; width:22px; height:22px; border-radius:50%; background:var(--primary); color:#fff; font-size:11px; font-weight:800; display:flex; align-items:center; justify-content:center; margin-top:1px; }
+.help-faq { margin-bottom:12px; font-size:13px; }
+.help-faq summary { cursor:pointer; font-weight:600; padding:6px 0; color:rgba(255,255,255,.85); list-style:none; display:flex; align-items:center; gap:6px; }
+.help-faq summary::before { content:'▶'; font-size:9px; color:var(--muted); transition:transform .15s; }
+.help-faq[open] summary::before { transform:rotate(90deg); }
+.help-faq p { margin:6px 0 0 18px; color:var(--muted); line-height:1.7; }
+.help-badge { display:inline-block; padding:1px 7px; border-radius:4px; font-size:11px; font-weight:700; margin:0 2px; }
+.help-badge.verde { background:rgba(34,197,94,.2); color:#4ade80; }
+.help-badge.amarillo { background:rgba(234,179,8,.2); color:#facc15; }
+.help-badge.naranja { background:rgba(249,115,22,.2); color:#fb923c; }
+.help-badge.rojo { background:rgba(239,68,68,.2); color:#f87171; }
 </style>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 </head>
 <body>
 
@@ -297,6 +334,7 @@ a { color: var(--primary); }
   <button class="header-btn hbtn-ghost" onclick="importData()" title="Importar datos JSON">⬆ Importar</button>
   <button class="header-btn hbtn-ghost" onclick="exportData()" title="Exportar datos JSON">⬇ Exportar</button>
   <button class="header-btn hbtn-ghost" id="btn-force-cloud" onclick="forceSaveToCloud()" title="Forzar guardado en nube ahora" style="display:none">☁ Guardar</button>
+  <button class="header-btn hbtn-ghost" onclick="openHelpModal()" title="Ayuda y FAQ">? Ayuda</button>
   <button class="header-btn hbtn-ghost" onclick="openSettingsModal()" title="Ajustes y nube">⚙ Ajustes</button>
   <button class="header-btn hbtn-primary" onclick="openProjectModal(null)">＋ Proyecto</button>
 </div>
@@ -316,6 +354,7 @@ a { color: var(--primary); }
   <div class="tab active" id="tab-portfolio" onclick="showTab('portfolio')">📊 Portfolio</div>
   <div class="tab" id="tab-preventa" onclick="showTab('preventa')">🎯 Preventa</div>
   <div class="tab" id="tab-historico" onclick="showTab('historico')">📦 Histórico</div>
+  <div class="tab" id="tab-partes" onclick="showTab('partes')">📋 Partes</div>
 </div>
 
 <!-- MAIN -->
@@ -407,6 +446,23 @@ a { color: var(--primary); }
     </div>
   </div>
 
+  <!-- ===== PARTES DE TRABAJO ===== -->
+  <div id="view-partes" class="hidden">
+    <div class="partes-header">
+      <h2>📋 Partes de trabajo</h2>
+      <button class="btn btn-primary" onclick="document.getElementById('partes-file-input').click()">📥 Importar Excel</button>
+      <input type="file" id="partes-file-input" accept=".xlsx" style="display:none" onchange="importPartes(this)">
+      <span id="partes-filename" style="font-size:12px;color:var(--muted)"></span>
+    </div>
+    <div id="partes-content">
+      <div class="partes-empty">
+        <div style="font-size:48px;margin-bottom:12px">📊</div>
+        <p>Importa un Excel de partes de trabajo para ver el informe visual</p>
+        <p style="font-size:12px;color:var(--muted)">Cada hoja del Excel debe corresponder a un codigo de proyecto (ej. PRO-0145-01)</p>
+      </div>
+    </div>
+  </div>
+
 </div><!-- /main -->
 
 <!-- ===== MODAL: PROYECTO ===== -->
@@ -479,6 +535,11 @@ a { color: var(--primary); }
           <div class="form-group">
             <label class="form-label">% Progreso</label>
             <input type="number" class="form-input" id="f-progreso" placeholder="0-100" min="0" max="100">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Codigo proyecto (partes)</label>
+            <input class="form-input" id="f-codigo-proyecto" placeholder="PRO-0145-01">
+            <span class="form-hint">Vincula con los partes de trabajo importados</span>
           </div>
           <div class="form-group full" style="display:flex;align-items:center;justify-content:space-between;background:rgba(96,165,250,.06);border:1px solid rgba(96,165,250,.2);border-radius:8px;padding:10px 14px">
             <div>
@@ -866,6 +927,91 @@ a { color: var(--primary); }
   </div>
 </div>
 
+<!-- ===== MODAL: AYUDA ===== -->
+<div class="overlay hidden" id="help-modal" onclick="closeModal('help-modal')">
+  <div class="modal help-modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <span class="modal-title">? Ayuda y FAQ</span>
+      <button class="modal-close" onclick="closeModal('help-modal')">✕</button>
+    </div>
+    <div class="help-body">
+
+      <div class="help-section">
+        <h3>Dar de alta un proyecto</h3>
+        <div class="help-step"><div class="help-num">1</div><div>Pulsa <strong>+ Proyecto</strong> en la cabecera para abrir el formulario.</div></div>
+        <div class="help-step"><div class="help-num">2</div><div>Rellena los campos obligatorios: <strong>Cliente</strong> y <strong>Nombre del proyecto</strong>.</div></div>
+        <div class="help-step"><div class="help-num">3</div><div>Elige el <strong>Estado</strong> inicial, el <strong>Area</strong> y el <strong>Responsable</strong>.</div></div>
+        <div class="help-step"><div class="help-num">4</div><div>Introduce las <strong>Jornadas estimadas</strong> y las fechas de inicio y fin.</div></div>
+        <div class="help-step"><div class="help-num">5</div><div>Opcional: define el presupuesto por perfiles con el boton <strong>Editar presupuesto</strong>, y añade URLs de seguimiento, oferta o plan.</div></div>
+        <div class="help-step"><div class="help-num">6</div><div>Si usas partes de trabajo, anota el <strong>Codigo de proyecto</strong> (ej. PRO-0145-01) para vincularlo automaticamente.</div></div>
+        <div class="help-step"><div class="help-num">7</div><div>Guarda. El proyecto aparece en el Portfolio y los KPIs se actualizan al momento.</div></div>
+      </div>
+
+      <div class="help-section">
+        <h3>Mantener un proyecto</h3>
+        <div class="help-step"><div class="help-num">1</div><div>Haz clic en cualquier fila del portfolio para <strong>expandirla</strong> y ver el detalle completo.</div></div>
+        <div class="help-step"><div class="help-num">2</div><div>Pulsa el icono de edicion para actualizar el <strong>% de progreso</strong> y las <strong>jornadas consumidas</strong> manualmente, o importa los partes para que se calculen solos.</div></div>
+        <div class="help-step"><div class="help-num">3</div><div>Cambia el <strong>estado</strong> directamente haciendo clic en el punto de color de la fila.</div></div>
+        <div class="help-step"><div class="help-num">4</div><div>Cuando el proyecto termine, usa <strong>Archivar</strong> para moverlo al Historico con las jornadas reales y lecciones aprendidas.</div></div>
+      </div>
+
+      <div class="help-section">
+        <h3>Estados del proyecto</h3>
+        <div style="font-size:13px;line-height:2">
+          <span class="help-badge verde">Dentro del plan</span> Todo correcto, avanza segun lo previsto.<br>
+          <span class="help-badge amarillo">Planificado</span> En preparacion o pendiente de arrancar.<br>
+          <span class="help-badge naranja">Bloqueado</span> Hay un impedimento que impide avanzar.<br>
+          <span class="help-badge rojo">Fuera del plan</span> Desviacion significativa en plazo o alcance.
+        </div>
+      </div>
+
+      <div class="help-section">
+        <h3>Partes de trabajo</h3>
+        <div class="help-step"><div class="help-num">1</div><div>Exporta el Excel de partes desde la app interna de gestion de horas.</div></div>
+        <div class="help-step"><div class="help-num">2</div><div>Ve a la pestana <strong>Partes</strong> y pulsa <strong>Importar Excel</strong>.</div></div>
+        <div class="help-step"><div class="help-num">3</div><div>En la ficha de cada proyecto, escribe el <strong>Codigo de proyecto</strong> que aparece como nombre de hoja en el Excel (ej. PRO-0145-01).</div></div>
+        <div class="help-step"><div class="help-num">4</div><div>Las horas consumidas del portfolio se actualizan automaticamente desde los partes. Aparece el icono 📋 en la columna de jornadas cuando el dato viene de partes.</div></div>
+        <div class="help-step"><div class="help-num">5</div><div>Los partes se mantienen en memoria: hay que reimportarlos si recargas la pagina.</div></div>
+      </div>
+
+      <div class="help-section">
+        <h3>Preguntas frecuentes</h3>
+
+        <details class="help-faq" open>
+          <summary>Como cambio entre jornadas y horas?</summary>
+          <p>Pulsa el boton <strong>Jornadas / Horas</strong> en la cabecera. Todos los valores del portfolio se convierten automaticamente usando el factor configurado en Ajustes (por defecto 8 h/jornada).</p>
+        </details>
+
+        <details class="help-faq" open>
+          <summary>Donde se guardan los datos?</summary>
+          <p>En el <strong>localStorage</strong> de tu navegador. Los datos no salen de tu equipo salvo que configures la sincronizacion en la nube (JSONBin) desde Ajustes. Exporta regularmente en JSON como copia de seguridad.</p>
+        </details>
+
+        <details class="help-faq" open>
+          <summary>Puedo tener varios espacios de trabajo?</summary>
+          <p>Si. Usa <strong>Exportar</strong> para guardar el estado actual como fichero JSON, carga otro fichero con <strong>Importar</strong>, y cambia el nombre del workspace en la cabecera. Cada fichero JSON es un workspace independiente.</p>
+        </details>
+
+        <details class="help-faq" open>
+          <summary>Como funciona el presupuesto?</summary>
+          <p>Dentro de la ficha de proyecto, pulsa <strong>Editar presupuesto</strong> para añadir lineas por perfil (ej. 3 jornadas de Consultor Senior a 95 €/h). El coste estimado y el margen se calculan solos y aparecen en el portfolio.</p>
+        </details>
+
+        <details class="help-faq" open>
+          <summary>Que pasa si borro el navegador o cambio de equipo?</summary>
+          <p>Perderas los datos si no has exportado ni activado la nube. Exporta el JSON periodicamente o configura JSONBin en Ajustes para tener una copia accesible desde cualquier sitio.</p>
+        </details>
+
+        <details class="help-faq" open>
+          <summary>Como añado un stakeholder o documento a un proyecto?</summary>
+          <p>Edita el proyecto y ve a las pestanas <strong>Stakeholders</strong> o <strong>Documentos</strong> dentro del formulario. Puedes añadir contactos con rol, email y telefono, y enlazar documentos con URL.</p>
+        </details>
+      </div>
+
+    </div>
+  </div>
+</div>
+
 <!-- FILE INPUT HIDDEN -->
 <input type="file" id="import-file" accept=".json" class="hidden" onchange="handleImport(event)">
 
@@ -920,6 +1066,7 @@ let tempDocs = [];
 let tempLineas = [];          // presupuesto lines being edited
 let expandedRows = new Set();
 let fsHandle = null; // File System API handle
+let partesData = {};  // { 'PRO-XXXX': { nombre, total, entries, porConsultor } }
 
 // ============================================================
 // INITIAL DATA (from PDF)
@@ -1248,7 +1395,10 @@ function renderTable() {
     const prog = +p.progreso || 0;
     const pbCls = prog >= 100 ? 'pb-over' : prog >= 80 ? 'pb-warn' : 'pb-ok';
     const jEst = +p.jornadasEst || 0;
-    const jCons = +p.jornadasCons || 0;
+    const partesHoras = p.codigoProyecto && partesData[p.codigoProyecto] ? partesData[p.codigoProyecto].total : null;
+    const hpj2 = DB.horasPorJornada || 8;
+    const jCons = partesHoras !== null ? partesHoras / hpj2 : (+p.jornadasCons || 0);
+    const fromPartes = partesHoras !== null;
     const jPct = jEst > 0 ? ((jCons/jEst)*100).toFixed(0)+'%' : '–';
     const respInitials = (p.responsable||'?').substring(0,3).toUpperCase();
     const dateRange = [p.inicio, p.fin].filter(Boolean).map(d=>fmtDate(d)).join(' → ') || '–';
@@ -1298,7 +1448,7 @@ function renderTable() {
           <span style="font-size:11px;font-weight:700;color:var(--muted)">${prog}%</span>
         </div>
       </td>
-      <td class="jorn-cell"><span class="jorn-est">${dispEst}</span> <span class="jorn-pct">(${jPct})</span></td>
+      <td class="jorn-cell"><span class="jorn-est">${dispEst}</span> <span class="jorn-pct">(${jPct})</span>${fromPartes ? '<span class="partes-icon" title="Horas desde partes de trabajo">📋</span>' : ''}</td>
       <td style="font-size:12px;font-weight:700;line-height:1.6">${econVal}</td>
       <td style="white-space:nowrap">${urlLinks||'<span style="color:var(--light);font-size:11px">–</span>'}</td>
       <td><div class="resp-badge" title="${escH(p.responsable||'')}">${escH(respInitials)}</div></td>
@@ -1435,6 +1585,7 @@ function openProjectModal(id, tabIndex=0) {
   document.getElementById('f-ingreso').value = p?.ingresoEstimado || '';
   document.getElementById('f-comercial').value = p?.comercial || '';
   document.getElementById('f-contexto').value = p?.contexto || '';
+  document.getElementById('f-codigo-proyecto').value = p?.codigoProyecto || '';
   // Labels according to unit
   const unidad = DB.unidad||'jornadas';
   document.getElementById('lbl-jornadas-est').textContent = unidad==='horas'?'Horas estimadas':'Jornadas estimadas';
@@ -1493,6 +1644,7 @@ function saveProject() {
     ingresoEstimado: +document.getElementById('f-ingreso').value || 0,
     comercial: document.getElementById('f-comercial').value.trim(),
     contexto: document.getElementById('f-contexto').value,
+    codigoProyecto: document.getElementById('f-codigo-proyecto').value.trim().toUpperCase(),
     lineasPresupuesto: tempLineas,
     presupuestoTotal: calcPresupTotal(tempLineas),
     stakeholders: tempStakeholders,
@@ -1768,12 +1920,13 @@ function saveConversion() {
 // UI HELPERS
 // ============================================================
 function showTab(tab) {
-  ['portfolio','preventa','historico'].forEach(t=>{
+  ['portfolio','preventa','historico','partes'].forEach(t=>{
     document.getElementById('view-'+t).classList.toggle('hidden',t!==tab);
     document.getElementById('tab-'+t).classList.toggle('active',t===tab);
   });
   if(tab==='preventa') renderPreventa();
   else if(tab==='historico') renderHistorico();
+  else if(tab==='partes') renderPartes();
   else renderTable();
 }
 
@@ -2104,6 +2257,12 @@ async function testCloudSync() {
 }
 
 // ============================================================
+// HELP MODAL
+// ============================================================
+function openHelpModal() {
+  document.getElementById('help-modal').classList.remove('hidden');
+}
+
 // SETTINGS MODAL
 // ============================================================
 function openSettingsModal() {
@@ -2165,6 +2324,108 @@ function downloadTemplate(type) {
     setTimeout(()=>{ URL.revokeObjectURL(a.href); document.body.removeChild(a); }, 300);
     showToast('📥 Descargando '+name);
   } catch(e) { showToast('❌ Error al generar la plantilla: '+e.message); }
+}
+
+// ============================================================
+// ============================================================
+// PARTES DE TRABAJO
+// ============================================================
+function importPartes(input) {
+  const file = input.files[0];
+  if(!file) return;
+  if(typeof XLSX === 'undefined') { showToast('❌ Libreria XLSX no cargada. Comprueba la conexion a internet.'); return; }
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const wb = XLSX.read(e.target.result, { type: 'array', cellDates: true });
+      partesData = {};
+      wb.SheetNames.forEach(sheetName => {
+        const ws = wb.Sheets[sheetName];
+        const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
+        const titleRow = rows[2] || [];
+        const titleCell = titleRow.find(c => c && typeof c === 'string' && c.includes('PARTES DE TRABAJO'));
+        const projectName = titleCell
+          ? titleCell.replace(/^PARTES DE TRABAJO\s*-\s*[A-Z0-9\-]+\s*-\s*/, '').trim()
+          : sheetName;
+        const entries = [];
+        for(let i = 4; i < rows.length; i++) {
+          const row = rows[i];
+          if(!row) continue;
+          const consultor = row[3];
+          const cantidad = parseFloat(row[4]);
+          const descripcion = row[5];
+          if(!consultor || isNaN(cantidad) || cantidad <= 0) continue;
+          const rawFecha = row[2];
+          const fecha = rawFecha instanceof Date
+            ? rawFecha.toLocaleDateString('es-ES')
+            : (rawFecha ? String(rawFecha) : '');
+          entries.push({ fecha, consultor: String(consultor).trim(), cantidad, descripcion: descripcion ? String(descripcion) : '' });
+        }
+        const total = entries.reduce((s, e) => s + e.cantidad, 0);
+        const porConsultor = {};
+        entries.forEach(e => { porConsultor[e.consultor] = (porConsultor[e.consultor] || 0) + e.cantidad; });
+        partesData[sheetName.trim().toUpperCase()] = { nombre: projectName, total, entries, porConsultor };
+      });
+      document.getElementById('partes-filename').textContent = file.name;
+      renderPartes();
+      renderTable();
+      renderKPIs();
+      showToast(`✅ ${wb.SheetNames.length} proyecto(s) importados`);
+    } catch(err) {
+      showToast('❌ Error al leer el Excel: ' + err.message);
+    }
+    input.value = '';
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function renderPartes() {
+  const container = document.getElementById('partes-content');
+  const codes = Object.keys(partesData);
+  if(!codes.length) {
+    container.innerHTML = `<div class="partes-empty"><div style="font-size:48px;margin-bottom:12px">📊</div><p>Importa un Excel de partes de trabajo para ver el informe visual</p><p style="font-size:12px;color:var(--muted)">Cada hoja del Excel debe corresponder a un codigo de proyecto (ej. PRO-0145-01)</p></div>`;
+    return;
+  }
+  const hpj = DB.horasPorJornada || 8;
+  const unidad = DB.unidad || 'jornadas';
+  container.innerHTML = codes.sort().map(code => {
+    const d = partesData[code];
+    const linkedProj = DB.projects.find(p => p.codigoProyecto === code);
+    const linkedLabel = linkedProj
+      ? `<span class="partes-linked">↔ ${escH(linkedProj.cliente)} · ${escH(linkedProj.nombre)}</span>`
+      : '<span style="color:var(--muted);font-size:11px">Sin vincular a ningun proyecto</span>';
+    const maxH = Math.max(...Object.values(d.porConsultor), 1);
+    const dispTotal = unidad === 'horas' ? `${d.total.toFixed(0)}h` : `${(d.total/hpj).toFixed(1)} J`;
+    const jEst = linkedProj ? (+linkedProj.jornadasEst || 0) : 0;
+    const horasEst = jEst * hpj;
+    const pct = horasEst > 0 ? Math.min(999, Math.round(d.total / horasEst * 100)) : null;
+    const pctColor = pct === null ? '' : pct >= 100 ? 'var(--danger)' : pct >= 80 ? 'var(--warning)' : 'var(--success)';
+    const pctLabel = pct !== null
+      ? `<span class="partes-pct" style="color:${pctColor}">${pct}% consumido</span>`
+      : (linkedProj ? '<span class="partes-pct" style="color:var(--muted)">sin estimacion</span>' : '');
+    const bars = Object.entries(d.porConsultor).sort((a,b) => b[1]-a[1]).map(([name, h]) => {
+      const disp = unidad === 'horas' ? `${h.toFixed(0)}h` : `${(h/hpj).toFixed(1)} J`;
+      return `<div class="partes-consultor-bar">
+        <span style="width:140px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escH(name)}</span>
+        <div class="partes-bar-bg"><div class="partes-bar-fill" style="width:${(h/maxH*100).toFixed(0)}%"></div></div>
+        <span style="width:55px;text-align:right;flex-shrink:0;font-variant-numeric:tabular-nums">${disp}</span>
+      </div>`;
+    }).join('');
+    return `<div class="partes-project-card">
+      <div class="partes-card-header">
+        <span class="partes-code">${escH(code)}</span>
+        <div style="min-width:0">
+          <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escH(d.nombre)}</div>
+          <div style="margin-top:2px">${linkedLabel}</div>
+        </div>
+        <span class="partes-total">${dispTotal}${pctLabel}</span>
+      </div>
+      <div class="partes-card-body">
+        ${bars}
+        <div style="font-size:11px;color:var(--muted);margin-top:10px">${d.entries.length} registros</div>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 // ============================================================
