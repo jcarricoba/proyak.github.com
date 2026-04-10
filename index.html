@@ -319,6 +319,19 @@ a { color: var(--primary); }
 .anal-fill-mes { background: var(--orange); }
 .anal-val { font-size: 11px; color: var(--muted); font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
 .anal-filter-bar { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); padding: 10px 14px; margin-bottom: 12px; display: flex; gap: 10px; align-items: center; }
+/* LN tabs en Partes */
+.ln-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+.ln-tab { padding: 5px 14px; border-radius: 20px; font-size: 11px; font-weight: 700; cursor: pointer; border: 1px solid var(--border); background: var(--surface); color: var(--muted); transition: all .15s; }
+.ln-tab:hover { background: var(--border); color: var(--text); }
+.ln-tab.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+.ln-badge { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: 700; background: rgba(251,146,60,.15); color: var(--orange); margin-left: 4px; vertical-align: middle; }
+/* Tabla consultores analisis */
+.anal-cons-table { width: 100%; border-collapse: collapse; }
+.anal-cons-table th { font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; padding: 6px 10px; border-bottom: 2px solid var(--border); text-align: left; }
+.anal-cons-table th.num { text-align: right; }
+.anal-cons-table td { padding: 8px 10px; border-bottom: 1px solid var(--border); font-size: 12px; vertical-align: middle; }
+.anal-cons-table tbody tr:hover td { background: rgba(255,255,255,.03); }
+.anal-cons-table tr:last-child td { border-bottom: none; }
 </style>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 </head>
@@ -1111,7 +1124,8 @@ let tempDocs = [];
 let tempLineas = [];          // presupuesto lines being edited
 let expandedRows = new Set();
 let fsHandle = null; // File System API handle
-let partesData = {};  // { 'PRO-XXXX': { nombre, total, entries, porConsultor } }
+let partesData = {};  // { 'PRO-XXXX': { nombre, total, entries, porConsultor, ln } }
+let partesLnFilter = '';  // LN activa en la pestaña Partes
 
 // ============================================================
 // INITIAL DATA (from PDF)
@@ -2391,9 +2405,11 @@ function isControlHorasFormat(wb) {
 }
 
 function parsePartesPorProyecto(wb) {
-  // Formato: una hoja por proyecto, codigo = nombre hoja
+  // Formato: una hoja por proyecto, codigo = nombre hoja. Solo hojas PRO-*
   const result = {};
   wb.SheetNames.forEach(sheetName => {
+    const key = sheetName.trim().toUpperCase();
+    if(!key.startsWith('PRO')) return;
     const ws = wb.Sheets[sheetName];
     const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
     const titleRow = rows[2] || [];
@@ -2415,34 +2431,67 @@ function parsePartesPorProyecto(wb) {
     const total = entries.reduce((s, e) => s + e.cantidad, 0);
     const porConsultor = {};
     entries.forEach(e => { porConsultor[e.consultor] = (porConsultor[e.consultor] || 0) + e.cantidad; });
-    result[sheetName.trim().toUpperCase()] = { nombre: projectName, total, entries, porConsultor };
+    result[key] = { nombre: projectName, total, entries, porConsultor, ln: '' };
   });
   return result;
 }
 
 function parseControlHoras(wb) {
-  // Formato: una hoja por mes, codigo = columna 4, consultor = col 2, horas = col 10
+  // Formato: una hoja por mes, cabeceras dinámicas.
+  // Solo proyectos PRO-* y tipos 0.H.NORMAL / 1.H.IT
+  const TIPO_OK = new Set(['0.H.NORMAL', '1.H.IT']);
+  const norm = s => String(s||'').toUpperCase().replace(/\s+/g,'');
+  const findCol = (headers, ...terms) => headers.findIndex(h => terms.some(t => norm(h).includes(norm(t))));
+
   const result = {};
   wb.SheetNames
     .filter(n => MESES.includes(n.toLowerCase().trim()))
     .forEach(sheetName => {
       const ws = wb.Sheets[sheetName];
-      const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
-      for(let i = 4; i < rows.length; i++) {
-        const row = rows[i];
+      const matrix = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
+
+      // Localizar fila de cabecera (contiene CONSULTOR y CODIGO)
+      let headerIdx = -1;
+      for(let i = 0; i < Math.min(matrix.length, 12); i++) {
+        const r = matrix[i] || [];
+        if(r.some(c => norm(c).includes('CONSULTOR')) && r.some(c => norm(c).includes('CODIGO'))) {
+          headerIdx = i; break;
+        }
+      }
+      if(headerIdx === -1) return;
+
+      const headers = matrix[headerIdx] || [];
+      const iCons    = findCol(headers, 'CONSULTOR', 'EMPLEADO', 'RECURSO');
+      const iFecha   = findCol(headers, 'FECHA', 'DIA', 'DATE');
+      const iCodigo  = findCol(headers, 'CODIGO', 'CÓDIGO', 'COD');
+      const iProyecto= findCol(headers, 'PROYECTO', 'NOMBREPROYECTO');
+      const iHoras   = findCol(headers, 'HORAS', 'HORA');
+      const iTipo    = findCol(headers, 'TIPODEHORAS', 'TIPOHORAS', 'TIPO');
+      const iLN      = findCol(headers, 'LNPROY', 'LNPROYECTO', 'LINEANEGOCIOPROYECTO', 'LN');
+      if(iCons === -1 || iCodigo === -1 || iHoras === -1) return;
+
+      for(let i = headerIdx + 1; i < matrix.length; i++) {
+        const row = matrix[i];
         if(!row) continue;
-        const consultor = row[2];
-        const rawFecha = row[3];
-        const codigo = row[4];
-        const proyecto = row[5];
-        const horas = parseFloat(row[10]);
+        const consultor = row[iCons];
+        const codigo    = row[iCodigo];
+        const horas     = parseFloat(row[iHoras]);
         if(!consultor || !codigo || isNaN(horas) || horas <= 0) continue;
+
         const key = String(codigo).trim().toUpperCase();
-        if(!result[key]) result[key] = { nombre: proyecto ? String(proyecto).trim() : key, total: 0, entries: [], porConsultor: {} };
+        if(!key.startsWith('PRO')) continue;
+
+        const tipo = iTipo !== -1 ? String(row[iTipo]||'').trim() : '';
+        if(tipo && !TIPO_OK.has(tipo)) continue;
+
+        const rawFecha = iFecha !== -1 ? row[iFecha] : null;
         const fecha = rawFecha instanceof Date ? rawFecha.toLocaleDateString('es-ES') : (rawFecha ? String(rawFecha) : '');
         const cons = String(consultor).trim();
+        const nombre = iProyecto !== -1 && row[iProyecto] ? String(row[iProyecto]).trim() : key;
+        const ln = iLN !== -1 && row[iLN] ? String(row[iLN]).trim().toUpperCase() : '';
+        if(!result[key]) result[key] = { nombre, total: 0, entries: [], porConsultor: {}, ln };
         result[key].total += horas;
-        result[key].entries.push({ fecha, consultor: cons, cantidad: horas, descripcion: row[9] ? String(row[9]) : '' });
+        result[key].entries.push({ fecha, consultor: cons, cantidad: horas, descripcion: '' });
         result[key].porConsultor[cons] = (result[key].porConsultor[cons] || 0) + horas;
       }
     });
@@ -2507,7 +2556,19 @@ function renderPartes() {
   }
   const hpj = DB.horasPorJornada || 8;
   const unidad = DB.unidad || 'jornadas';
-  container.innerHTML = codes.sort().map(code => {
+
+  // LN tabs
+  const lnValues = [...new Set(codes.map(c => partesData[c].ln).filter(Boolean))].sort();
+  const hasLn = lnValues.length > 0;
+  if(hasLn && !lnValues.includes(partesLnFilter)) partesLnFilter = '';
+  const lnTabsHtml = hasLn ? `<div class="ln-tabs">
+    <div class="ln-tab ${partesLnFilter===''?'active':''}" onclick="partesLnFilter='';renderPartes()">Todas</div>
+    ${lnValues.map(ln=>`<div class="ln-tab ${partesLnFilter===ln?'active':''}" onclick="partesLnFilter='${escH(ln)}';renderPartes()">${escH(ln)}</div>`).join('')}
+  </div>` : '';
+
+  const filteredCodes = codes.filter(c => !hasLn || !partesLnFilter || partesData[c].ln === partesLnFilter);
+
+  const cards = filteredCodes.sort().map(code => {
     const d = partesData[code];
     const linkedProj = DB.projects.find(p => p.codigoProyecto === code);
     const linkedLabel = linkedProj
@@ -2522,6 +2583,7 @@ function renderPartes() {
     const pctLabel = pct !== null
       ? `<span class="partes-pct" style="color:${pctColor}">${pct}% consumido</span>`
       : (linkedProj ? '<span class="partes-pct" style="color:var(--muted)">sin estimacion</span>' : '');
+    const lnBadge = d.ln ? `<span class="ln-badge">${escH(d.ln)}</span>` : '';
     const bars = Object.entries(d.porConsultor).sort((a,b) => b[1]-a[1]).map(([name, h]) => {
       const disp = unidad === 'horas' ? `${h.toFixed(0)}h` : `${(h/hpj).toFixed(1)} J`;
       return `<div class="partes-consultor-bar">
@@ -2532,7 +2594,7 @@ function renderPartes() {
     }).join('');
     return `<div class="partes-project-card">
       <div class="partes-card-header">
-        <span class="partes-code">${escH(code)}</span>
+        <span class="partes-code">${escH(code)}${lnBadge}</span>
         <div style="min-width:0">
           <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escH(d.nombre)}</div>
           <div style="margin-top:2px">${linkedLabel}</div>
@@ -2545,6 +2607,8 @@ function renderPartes() {
       </div>
     </div>`;
   }).join('');
+
+  container.innerHTML = lnTabsHtml + (cards || `<div class="partes-empty"><p>Sin proyectos para esta línea de negocio</p></div>`);
 }
 
 // ============================================================
@@ -2640,11 +2704,16 @@ function renderAnalisis() {
   const projList = Object.entries(byProj).sort((a,b)=>b[1].h-a[1].h);
   const maxProjH = projList.length ? projList[0][1].h : 1;
 
-  // Aggregate by consultant
+  // Aggregate by consultant + proyectos por consultor
   const byCons = {};
-  filtered.forEach(e => { if(e.consultor) byCons[e.consultor]=(byCons[e.consultor]||0)+(e.cantidad||0); });
-  const consList = Object.entries(byCons).sort((a,b)=>b[1]-a[1]);
-  const maxConsH = consList.length ? consList[0][1] : 1;
+  filtered.forEach(e => {
+    if(!e.consultor) return;
+    if(!byCons[e.consultor]) byCons[e.consultor] = { h: 0, proyectos: new Set() };
+    byCons[e.consultor].h += e.cantidad||0;
+    byCons[e.consultor].proyectos.add(e.code);
+  });
+  const consList = Object.entries(byCons).sort((a,b)=>b[1].h-a[1].h);
+  const maxConsH = consList.length ? consList[0][1].h : 1;
 
   // Aggregate by month
   const byMes = {};
@@ -2663,13 +2732,22 @@ function renderAnalisis() {
     </div>`;
   }).join('');
 
-  const consBars = consList.slice(0,12).map(([cons,h]) =>
-    `<div class="anal-bar-row">
-      <div class="anal-bar-info"><span style="font-size:12px;font-weight:600">${escH(cons)}</span></div>
-      <div class="anal-track"><div class="anal-fill anal-fill-cons" style="width:${(h/maxConsH*100).toFixed(0)}%"></div></div>
-      <span class="anal-val">${dispH(h)}</span>
-    </div>`
-  ).join('');
+  const consRows = consList.slice(0,20).map(([cons,{h,proyectos}]) => {
+    const pct = totalH > 0 ? Math.round(h/totalH*100) : 0;
+    const pctColor = pct >= 40 ? 'var(--success)' : pct >= 20 ? 'var(--warning)' : 'var(--muted)';
+    const barW = maxConsH > 0 ? (h/maxConsH*100).toFixed(0) : 0;
+    return `<tr>
+      <td style="font-weight:600;max-width:160px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escH(cons)}</td>
+      <td style="width:180px">
+        <div style="display:flex;align-items:center;gap:6px">
+          <div class="anal-track" style="flex:1"><div class="anal-fill anal-fill-cons" style="width:${barW}%"></div></div>
+          <span class="anal-val" style="width:48px">${dispH(h)}</span>
+        </div>
+      </td>
+      <td class="num" style="text-align:center"><span style="font-size:11px;font-weight:700;background:rgba(96,165,250,.12);color:var(--primary);padding:2px 8px;border-radius:10px">${proyectos.size}</span></td>
+      <td class="num" style="text-align:right;font-weight:700;color:${pctColor}">${pct}%</td>
+    </tr>`;
+  }).join('');
 
   const mesBars = mesList.map(([mes,h]) => {
     const label = mes.replace(/^\d{4}-\d{2} \(/,'').replace(/\)$/,'');
@@ -2687,8 +2765,16 @@ function renderAnalisis() {
         <div class="anal-bars">${projBars||'<span style="color:var(--muted);font-size:12px">Sin datos</span>'}</div>
       </div>
       <div class="anal-card">
-        <h3>Top consultores</h3>
-        <div class="anal-bars">${consBars||'<span style="color:var(--muted);font-size:12px">Sin datos</span>'}</div>
+        <h3>Consultores</h3>
+        ${consRows ? `<table class="anal-cons-table">
+          <thead><tr>
+            <th>Consultor</th>
+            <th>Horas</th>
+            <th style="text-align:center">Proyectos</th>
+            <th class="num">% total</th>
+          </tr></thead>
+          <tbody>${consRows}</tbody>
+        </table>` : '<span style="color:var(--muted);font-size:12px">Sin datos</span>'}
       </div>
     </div>
     ${mesList.length > 1 ? `<div class="anal-card" style="margin-bottom:16px">
