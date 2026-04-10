@@ -451,7 +451,7 @@ a { color: var(--primary); }
     <div class="partes-header">
       <h2>📋 Partes de trabajo</h2>
       <button class="btn btn-primary" onclick="document.getElementById('partes-file-input').click()">📥 Importar Excel</button>
-      <input type="file" id="partes-file-input" accept=".xlsx" style="display:none" onchange="importPartes(this)">
+      <input type="file" id="partes-file-input" accept=".xlsx" multiple style="display:none" onchange="importPartes(this)">
       <span id="partes-filename" style="font-size:12px;color:var(--muted)"></span>
     </div>
     <div id="partes-content">
@@ -2403,29 +2403,52 @@ function parseControlHoras(wb) {
   return result;
 }
 
-function importPartes(input) {
-  const file = input.files[0];
-  if(!file) return;
+function readFileAsArrayBuffer(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => resolve(e.target.result);
+    reader.onerror = reject;
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+async function importPartes(input) {
+  const files = Array.from(input.files);
+  if(!files.length) return;
   if(typeof XLSX === 'undefined') { showToast('❌ Libreria XLSX no cargada. Comprueba la conexion a internet.'); return; }
-  const reader = new FileReader();
-  reader.onload = function(e) {
-    try {
-      const wb = XLSX.read(e.target.result, { type: 'array', cellDates: true });
-      const monthly = isControlHorasFormat(wb);
-      partesData = monthly ? parseControlHoras(wb) : parsePartesPorProyecto(wb);
-      const nProyectos = Object.keys(partesData).length;
-      localStorage.setItem('proyak_partes', JSON.stringify({ data: partesData, file: file.name, date: new Date().toISOString() }));
-      document.getElementById('partes-filename').textContent = file.name;
-      renderPartes();
-      renderTable();
-      renderKPIs();
-      showToast(`✅ ${nProyectos} proyecto(s) importados`);
-    } catch(err) {
-      showToast('❌ Error al leer el Excel: ' + err.message);
+  partesData = {};
+  const fileNames = [];
+  try {
+    for(const file of files) {
+      const buffer = await readFileAsArrayBuffer(file);
+      const wb = XLSX.read(buffer, { type: 'array', cellDates: true });
+      const parsed = isControlHorasFormat(wb) ? parseControlHoras(wb) : parsePartesPorProyecto(wb);
+      // Merge: si un proyecto ya existe, suma entradas y horas
+      for(const [code, d] of Object.entries(parsed)) {
+        if(!partesData[code]) {
+          partesData[code] = { ...d };
+        } else {
+          partesData[code].total += d.total;
+          partesData[code].entries.push(...d.entries);
+          for(const [cons, h] of Object.entries(d.porConsultor)) {
+            partesData[code].porConsultor[cons] = (partesData[code].porConsultor[cons] || 0) + h;
+          }
+        }
+      }
+      fileNames.push(file.name);
     }
-    input.value = '';
-  };
-  reader.readAsArrayBuffer(file);
+    const nProyectos = Object.keys(partesData).length;
+    const label = files.length > 1 ? `${files.length} ficheros` : files[0].name;
+    localStorage.setItem('proyak_partes', JSON.stringify({ data: partesData, file: label, date: new Date().toISOString() }));
+    document.getElementById('partes-filename').textContent = label;
+    renderPartes();
+    renderTable();
+    renderKPIs();
+    showToast(`✅ ${nProyectos} proyecto(s) de ${files.length} fichero(s)`);
+  } catch(err) {
+    showToast('❌ Error al leer el Excel: ' + err.message);
+  }
+  input.value = '';
 }
 
 function renderPartes() {
