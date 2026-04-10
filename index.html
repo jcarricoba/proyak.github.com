@@ -1011,9 +1011,12 @@ function saveData(toast=true) {
   const el = document.getElementById('last-saved');
   el.textContent = 'Guardado ' + new Date().toLocaleTimeString('es-ES', {hour:'2-digit',minute:'2-digit'});
   if(toast) showToast('✅ Guardado');
-  if(fsHandle) saveToFile();
-  // Cloud sync (debounced)
-  if(DB.cloudKey) { clearTimeout(cloudSyncTimer); cloudSyncTimer = setTimeout(pushToCloud, 2500); }
+  if(fsHandle) {
+    saveToFile();
+  } else if(DB.cloudKey) {
+    clearTimeout(cloudSyncTimer);
+    cloudSyncTimer = setTimeout(pushToCloud, 2500);
+  }
 }
 
 async function saveToFile() {
@@ -1959,8 +1962,8 @@ async function pushToCloud() {
   }
 }
 
-async function pullFromCloud() {
-  if(!DB.cloudKey || !DB.cloudBin) { showToast('⚠ Configura API Key y Bin ID primero'); return; }
+async function pullFromCloud(silent=false) {
+  if(!DB.cloudKey || !DB.cloudBin) { if(!silent) showToast('⚠ Configura API Key y Bin ID primero'); return; }
   try {
     const res = await fetch(`https://api.jsonbin.io/v3/b/${DB.cloudBin}/latest`, {
       headers: { 'X-Master-Key': DB.cloudKey }
@@ -1976,10 +1979,10 @@ async function pullFromCloud() {
       renderAll();
       showToast('☁ Datos actualizados desde la nube');
     } else {
-      showToast('✅ Ya tienes la versión más reciente');
+      if(!silent) showToast('✅ Ya tienes la versión más reciente');
     }
   } catch(e) {
-    showToast('❌ Error al conectar: ' + e.message);
+    if(!silent) showToast('❌ Error al conectar: ' + e.message);
   }
 }
 
@@ -2296,6 +2299,7 @@ function addPerfil() {
 // BOOT
 // ============================================================
 loadData();
+if(DB.cloudKey && DB.cloudBin) pullFromCloud(true);
 renderAll();
 </script>
 </body>
