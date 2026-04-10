@@ -28,6 +28,10 @@ body { font-family: -apple-system, "Segoe UI", Arial, sans-serif; background: va
 .workspace-edit { background: transparent; border: none; color: #fff; font-size: 11px; width: 140px; outline: none; }
 .header-sep { flex: 1; }
 .header-saved { font-size: 11px; color: rgba(255,255,255,.4); }
+.cloud-bar { font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 12px; display: none; }
+.cloud-bar.ok  { background: rgba(74,222,128,.15); color: #4ade80; }
+.cloud-bar.pending { background: rgba(251,191,36,.12); color: #fbbf24; }
+.cloud-bar.error { background: rgba(248,113,113,.15); color: #f87171; }
 .header-btn { display: flex; align-items: center; gap: 5px; padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; border: none; transition: all .15s; }
 .hbtn-ghost { background: rgba(255,255,255,.08); color: rgba(255,255,255,.8); }
 .hbtn-ghost:hover { background: rgba(255,255,255,.15); }
@@ -284,12 +288,14 @@ a { color: var(--primary); }
     ✏ <input class="workspace-edit" id="ws-name" value="Mi Área" onchange="saveWsName()" onclick="event.stopPropagation()">
   </div>
   <span class="header-saved" id="last-saved"></span>
+  <span class="cloud-bar" id="cloud-bar"></span>
   <div class="header-sep"></div>
-  <button class="header-btn hbtn-ghost" id="unit-toggle" onclick="toggleUnidad()" title="Cambiar entre jornadas y horas">⏱ Jornadas</button>
+  <button class="header-btn hbtn-ghost" id="unit-toggle" onclick="toggleUnidad()" title="Cambiar entre jornadas y horas">⏱ Ver en horas</button>
   <button class="header-btn hbtn-ghost" onclick="downloadTemplate('est')" title="Plantilla Excel Estimación">📥 Est.</button>
   <button class="header-btn hbtn-ghost" onclick="downloadTemplate('gantt')" title="Plantilla Excel Gantt">📥 Gantt</button>
   <button class="header-btn hbtn-ghost" onclick="importData()" title="Importar datos JSON">⬆ Importar</button>
   <button class="header-btn hbtn-ghost" onclick="exportData()" title="Exportar datos JSON">⬇ Exportar</button>
+  <button class="header-btn hbtn-ghost" id="btn-force-cloud" onclick="forceSaveToCloud()" title="Forzar guardado en nube ahora" style="display:none">☁ Guardar</button>
   <button class="header-btn hbtn-ghost" onclick="openSettingsModal()" title="Ajustes y nube">⚙ Ajustes</button>
   <button class="header-btn hbtn-primary" onclick="openProjectModal(null)">＋ Proyecto</button>
 </div>
@@ -1006,15 +1012,26 @@ function loadData() {
   document.getElementById('ws-name').value = DB.workspace || 'Mi Área';
 }
 
+function setCloudBar(state, text) {
+  const bar = document.getElementById('cloud-bar');
+  const btn = document.getElementById('btn-force-cloud');
+  if(!bar) return;
+  bar.className = 'cloud-bar ' + (state||'');
+  bar.textContent = text;
+  bar.style.display = text ? '' : 'none';
+  if(btn) btn.style.display = DB.cloudKey ? '' : 'none';
+}
+
 function saveData(toast=true) {
   DB.lastSaved = new Date().toISOString();
   localStorage.setItem('proyak_v1', JSON.stringify(DB));
   const el = document.getElementById('last-saved');
-  el.textContent = 'Guardado ' + new Date().toLocaleTimeString('es-ES', {hour:'2-digit',minute:'2-digit'});
+  if(el) el.textContent = 'Guardado ' + new Date().toLocaleTimeString('es-ES', {hour:'2-digit',minute:'2-digit'});
   if(toast) showToast('✅ Guardado');
   if(fsHandle) {
     saveToFile();
   } else if(DB.cloudKey) {
+    setCloudBar('pending', '☁ Sincronizando...');
     clearTimeout(cloudSyncTimer);
     cloudSyncTimer = setTimeout(pushToCloud, 2500);
   }
@@ -1070,10 +1087,10 @@ function handleImport(e) {
       renderAll();
       showToast('⬆ Datos importados');
 
-      // Si hay nube: SIEMPRE cargar desde ella (es la fuente de verdad, no comparar fechas)
+      // Si hay nube: consultar y preguntar al usuario si hay datos más recientes
       if(cloudKey && cloudBin) {
         try {
-          showToast('☁ Conectando con la nube...');
+          showToast('☁ Consultando nube...');
           const res = await fetch(`https://api.jsonbin.io/v3/b/${cloudBin}/latest`, {
             headers: { 'X-Master-Key': cloudKey }
           });
@@ -1081,16 +1098,30 @@ function handleImport(e) {
             const result = await res.json();
             const remote = result.record;
             if(remote && remote.projects) {
-              DB = { ...remote, cloudKey, cloudBin };
-              localStorage.setItem('proyak_v1', JSON.stringify(DB));
-              renderAll();
-              showToast('☁ Datos cargados desde la nube');
+              const remoteDate = remote.lastSaved ? new Date(remote.lastSaved) : new Date(0);
+              const localDate  = data.lastSaved   ? new Date(data.lastSaved)   : new Date(0);
+              if(remoteDate > localDate) {
+                const remoteStr = remote.lastSaved
+                  ? new Date(remote.lastSaved).toLocaleString('es-ES', {day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'})
+                  : 'fecha desconocida';
+                const cargar = confirm(`☁ La nube tiene un backup más reciente (${remoteStr}).\n\n¿Cargar datos desde la nube?\n\n· Aceptar → usar datos de la nube\n· Cancelar → usar el JSON importado`);
+                if(cargar) {
+                  DB = { ...remote, cloudKey, cloudBin };
+                  localStorage.setItem('proyak_v1', JSON.stringify(DB));
+                  renderAll();
+                  showToast('☁ Datos cargados desde la nube');
+                  saveData(false);
+                  return;
+                }
+              } else {
+                showToast('✅ El JSON importado está al día con la nube');
+              }
             }
           } else {
-            showToast('⚠ Nube no disponible ('+res.status+'), usando datos del JSON');
+            showToast('⚠ Nube no disponible ('+res.status+')');
           }
         } catch(err) {
-          showToast('⚠ Error de red, usando datos del JSON');
+          showToast('⚠ Error de red al consultar la nube');
         }
       }
 
@@ -1989,11 +2020,19 @@ async function pushToCloud() {
       localStorage.setItem('proyak_v1', JSON.stringify(DB));
       showToast('☁ Bin creado: ' + DB.cloudBin);
     }
-    const el = document.getElementById('last-saved');
-    if(el) el.textContent = 'Guardado + ☁ ' + new Date().toLocaleTimeString('es-ES', { hour:'2-digit', minute:'2-digit' });
+    const hora = new Date().toLocaleTimeString('es-ES', { hour:'2-digit', minute:'2-digit' });
+    setCloudBar('ok', '☁ Guardado ' + hora);
   } catch(e) {
+    setCloudBar('error', '⚠ Error nube');
     console.warn('Cloud sync error:', e.message);
   }
+}
+
+async function forceSaveToCloud() {
+  if(!DB.cloudKey) { showToast('⚠ Configura la nube en Ajustes primero'); return; }
+  clearTimeout(cloudSyncTimer);
+  setCloudBar('pending', '☁ Guardando...');
+  await pushToCloud();
 }
 
 async function pullFromCloud(silent=false) {
@@ -2132,7 +2171,12 @@ function downloadTemplate(type) {
 function toggleUnidad() {
   DB.unidad = (DB.unidad||'jornadas')==='jornadas' ? 'horas' : 'jornadas';
   saveData(false);
-  renderAll();
+  const utb = document.getElementById('unit-toggle');
+  if(utb) utb.textContent = DB.unidad==='horas' ? '⏱ Ver en jornadas' : '⏱ Ver en horas';
+  const th = document.getElementById('th-jornadas');
+  if(th) th.textContent = DB.unidad==='horas' ? 'Horas' : 'Jornadas';
+  renderKPIs();
+  renderTable();
 }
 
 // ============================================================
@@ -2333,8 +2377,9 @@ function addPerfil() {
 // BOOT
 // ============================================================
 loadData();
-if(DB.cloudKey && DB.cloudBin) pullFromCloud(true);
 renderAll();
+if(DB.cloudKey) setCloudBar('ok', '☁ Nube conectada');
+if(DB.cloudKey && DB.cloudBin) pullFromCloud(true);
 </script>
 </body>
 </html>
