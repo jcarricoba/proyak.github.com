@@ -993,7 +993,8 @@ function loadData() {
     } else {
       DB.projects = [];
       DB.preventa = [];
-      saveData(false);
+      // No llamar saveData aquí — lastSaved queda undefined (epoch)
+      // para que pullFromCloud detecte correctamente que la nube es más reciente
     }
     // Load cloud settings from separate key (never lost on data import)
     const cs = localStorage.getItem('proyak_cloud');
