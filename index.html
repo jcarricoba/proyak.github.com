@@ -2338,6 +2338,71 @@ function downloadTemplate(type) {
 // ============================================================
 // PARTES DE TRABAJO
 // ============================================================
+const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+
+function isControlHorasFormat(wb) {
+  return wb.SheetNames.some(n => MESES.includes(n.toLowerCase().trim()));
+}
+
+function parsePartesPorProyecto(wb) {
+  // Formato: una hoja por proyecto, codigo = nombre hoja
+  const result = {};
+  wb.SheetNames.forEach(sheetName => {
+    const ws = wb.Sheets[sheetName];
+    const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
+    const titleRow = rows[2] || [];
+    const titleCell = titleRow.find(c => c && typeof c === 'string' && c.includes('PARTES DE TRABAJO'));
+    const projectName = titleCell
+      ? titleCell.replace(/^PARTES DE TRABAJO\s*-\s*[A-Z0-9\-]+\s*-\s*/, '').trim()
+      : sheetName;
+    const entries = [];
+    for(let i = 4; i < rows.length; i++) {
+      const row = rows[i];
+      if(!row) continue;
+      const consultor = row[3];
+      const cantidad = parseFloat(row[4]);
+      if(!consultor || isNaN(cantidad) || cantidad <= 0) continue;
+      const rawFecha = row[2];
+      const fecha = rawFecha instanceof Date ? rawFecha.toLocaleDateString('es-ES') : (rawFecha ? String(rawFecha) : '');
+      entries.push({ fecha, consultor: String(consultor).trim(), cantidad, descripcion: row[5] ? String(row[5]) : '' });
+    }
+    const total = entries.reduce((s, e) => s + e.cantidad, 0);
+    const porConsultor = {};
+    entries.forEach(e => { porConsultor[e.consultor] = (porConsultor[e.consultor] || 0) + e.cantidad; });
+    result[sheetName.trim().toUpperCase()] = { nombre: projectName, total, entries, porConsultor };
+  });
+  return result;
+}
+
+function parseControlHoras(wb) {
+  // Formato: una hoja por mes, codigo = columna 4, consultor = col 2, horas = col 10
+  const result = {};
+  wb.SheetNames
+    .filter(n => MESES.includes(n.toLowerCase().trim()))
+    .forEach(sheetName => {
+      const ws = wb.Sheets[sheetName];
+      const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
+      for(let i = 4; i < rows.length; i++) {
+        const row = rows[i];
+        if(!row) continue;
+        const consultor = row[2];
+        const rawFecha = row[3];
+        const codigo = row[4];
+        const proyecto = row[5];
+        const horas = parseFloat(row[10]);
+        if(!consultor || !codigo || isNaN(horas) || horas <= 0) continue;
+        const key = String(codigo).trim().toUpperCase();
+        if(!result[key]) result[key] = { nombre: proyecto ? String(proyecto).trim() : key, total: 0, entries: [], porConsultor: {} };
+        const fecha = rawFecha instanceof Date ? rawFecha.toLocaleDateString('es-ES') : (rawFecha ? String(rawFecha) : '');
+        const cons = String(consultor).trim();
+        result[key].total += horas;
+        result[key].entries.push({ fecha, consultor: cons, cantidad: horas, descripcion: row[9] ? String(row[9]) : '' });
+        result[key].porConsultor[cons] = (result[key].porConsultor[cons] || 0) + horas;
+      }
+    });
+  return result;
+}
+
 function importPartes(input) {
   const file = input.files[0];
   if(!file) return;
@@ -2346,40 +2411,15 @@ function importPartes(input) {
   reader.onload = function(e) {
     try {
       const wb = XLSX.read(e.target.result, { type: 'array', cellDates: true });
-      partesData = {};
-      wb.SheetNames.forEach(sheetName => {
-        const ws = wb.Sheets[sheetName];
-        const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
-        const titleRow = rows[2] || [];
-        const titleCell = titleRow.find(c => c && typeof c === 'string' && c.includes('PARTES DE TRABAJO'));
-        const projectName = titleCell
-          ? titleCell.replace(/^PARTES DE TRABAJO\s*-\s*[A-Z0-9\-]+\s*-\s*/, '').trim()
-          : sheetName;
-        const entries = [];
-        for(let i = 4; i < rows.length; i++) {
-          const row = rows[i];
-          if(!row) continue;
-          const consultor = row[3];
-          const cantidad = parseFloat(row[4]);
-          const descripcion = row[5];
-          if(!consultor || isNaN(cantidad) || cantidad <= 0) continue;
-          const rawFecha = row[2];
-          const fecha = rawFecha instanceof Date
-            ? rawFecha.toLocaleDateString('es-ES')
-            : (rawFecha ? String(rawFecha) : '');
-          entries.push({ fecha, consultor: String(consultor).trim(), cantidad, descripcion: descripcion ? String(descripcion) : '' });
-        }
-        const total = entries.reduce((s, e) => s + e.cantidad, 0);
-        const porConsultor = {};
-        entries.forEach(e => { porConsultor[e.consultor] = (porConsultor[e.consultor] || 0) + e.cantidad; });
-        partesData[sheetName.trim().toUpperCase()] = { nombre: projectName, total, entries, porConsultor };
-      });
+      const monthly = isControlHorasFormat(wb);
+      partesData = monthly ? parseControlHoras(wb) : parsePartesPorProyecto(wb);
+      const nProyectos = Object.keys(partesData).length;
       localStorage.setItem('proyak_partes', JSON.stringify({ data: partesData, file: file.name, date: new Date().toISOString() }));
       document.getElementById('partes-filename').textContent = file.name;
       renderPartes();
       renderTable();
       renderKPIs();
-      showToast(`✅ ${wb.SheetNames.length} proyecto(s) importados`);
+      showToast(`✅ ${nProyectos} proyecto(s) importados`);
     } catch(err) {
       showToast('❌ Error al leer el Excel: ' + err.message);
     }
