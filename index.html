@@ -1056,6 +1056,7 @@ const PREV_ESTADOS = {
 };
 
 let DB = {
+  appId: 'proyak',
   version: VERSION,
   workspace: 'Mi Área',
   areas: ['Herramientas', 'Servicios', 'Panet', 'Obsidian', 'I+D'],
@@ -1239,17 +1240,18 @@ function handleImport(e) {
       if(!data.projects) { showToast('❌ Fichero no válido'); return; }
 
       // Credenciales: el bin activo en localStorage siempre tiene prioridad sobre el del fichero
-      // (evita que un backup antiguo apunte a un bin diferente y cree uno nuevo)
+      // Si el JSON viene de otra app (appId distinto), ignorar su cloudBin para no mezclar bins
       let cloudKey = data.cloudKey;
-      let cloudBin = data.cloudBin;
+      let cloudBin = (data.appId && data.appId !== 'proyak') ? undefined : data.cloudBin;
+      if(data.appId && data.appId !== 'proyak') showToast('⚠ JSON de otra app — configuración de nube ignorada');
       try {
         const cs = JSON.parse(localStorage.getItem('proyak_cloud')||'{}');
         if(!cloudKey) cloudKey = cs.key;
         if(cs.bin) cloudBin = cs.bin; // bin local siempre gana
       } catch(e) {}
 
-      // Cargar datos del JSON como base
-      DB = { ...data, cloudKey, cloudBin };
+      // Cargar datos del JSON como base (appId siempre es el de esta app)
+      DB = { ...data, appId: 'proyak', cloudKey, cloudBin };
       if(cloudKey) localStorage.setItem('proyak_cloud', JSON.stringify({key: cloudKey, bin: cloudBin||''}));
       localStorage.setItem('proyak_v1', JSON.stringify(DB));
       renderAll();
