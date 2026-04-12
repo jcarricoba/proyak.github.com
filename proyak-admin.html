@@ -89,7 +89,7 @@ tr:hover td { background: rgba(255,255,255,.02); }
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.12.0/firebase-app.js";
-import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.12.0/firebase-auth.js";
+import { getAuth, signInWithRedirect, getRedirectResult, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.12.0/firebase-auth.js";
 import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/12.12.0/firebase-firestore.js";
 
 const ADMIN_UIDS = ['El6MTxcd3AcCgTkkBzsv5tSbWR83'];
@@ -108,7 +108,7 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const provider = new GoogleAuthProvider();
 
-window.doSignIn = () => signInWithPopup(auth, provider).catch(e => {
+window.doSignIn = () => signInWithRedirect(auth, provider).catch(e => {
   document.getElementById('login-error').textContent = e.message;
   document.getElementById('login-error').style.display = '';
 });
@@ -190,6 +190,8 @@ window.loadUsers = async function() {
     tbody.innerHTML = `<tr><td colspan="5" class="empty" style="color:#f87171">Error: ${e.message}</td></tr>`;
   }
 };
+
+getRedirectResult(auth).catch(() => {});
 
 onAuthStateChanged(auth, user => {
   if (user) {

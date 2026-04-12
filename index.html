@@ -1151,7 +1151,7 @@ a { color: var(--primary); }
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.12.0/firebase-app.js";
-import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.12.0/firebase-auth.js";
+import { getAuth, signInWithRedirect, getRedirectResult, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.12.0/firebase-auth.js";
 import { getFirestore, doc, setDoc, getDoc, collection, getDocs } from "https://www.gstatic.com/firebasejs/12.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -1169,13 +1169,15 @@ const db = getFirestore(app);
 const provider = new GoogleAuthProvider();
 
 window._fb = { auth, db,
-  signIn: () => signInWithPopup(auth, provider),
+  signIn: () => signInWithRedirect(auth, provider),
   signOut: () => signOut(auth),
   saveUser: (uid, data) => setDoc(doc(db, 'users', uid, 'workspace', 'data'), data),
   saveProfile: (uid, profile) => setDoc(doc(db, 'users', uid), profile, { merge: true }),
   loadUser: async (uid) => { const s = await getDoc(doc(db, 'users', uid, 'workspace', 'data')); return s.exists() ? s.data() : null; },
   getAllUsers: async () => { const s = await getDocs(collection(db, 'users')); return s.docs.map(d => ({uid: d.id, ...d.data()})); }
 };
+
+getRedirectResult(auth).catch(() => {});
 
 onAuthStateChanged(auth, user => {
   window._fbUser = user || null;
