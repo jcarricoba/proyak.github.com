@@ -688,20 +688,15 @@ a { color: var(--primary); }
           </div>
           <div class="form-group">
             <label class="form-label" id="lbl-jornadas-est">Jornadas estimadas</label>
-            <input type="number" class="form-input" id="f-jornadas-est" placeholder="0" step="0.5" min="0">
+            <input type="number" class="form-input" id="f-jornadas-est" placeholder="0" step="0.5" min="0" oninput="autoProgreso()">
           </div>
           <div class="form-group">
             <label class="form-label" id="lbl-jornadas-cons">Jornadas consumidas</label>
-            <input type="number" class="form-input" id="f-jornadas-cons" placeholder="0" step="0.5" min="0">
+            <input type="number" class="form-input" id="f-jornadas-cons" placeholder="0" step="0.5" min="0" oninput="autoProgreso()">
           </div>
           <div class="form-group">
             <label class="form-label">% Progreso</label>
             <input type="number" class="form-input" id="f-progreso" placeholder="0-100" min="0" max="100">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Codigo proyecto (partes)</label>
-            <input class="form-input" id="f-codigo-proyecto" placeholder="PRO-0145-01">
-            <span class="form-hint">Vincula con los partes de trabajo importados</span>
           </div>
           <div class="form-group full" style="display:flex;align-items:center;justify-content:space-between;background:rgba(96,165,250,.06);border:1px solid rgba(96,165,250,.2);border-radius:8px;padding:10px 14px">
             <div>
@@ -1152,7 +1147,7 @@ a { color: var(--primary); }
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.12.0/firebase-app.js";
 import { getAuth, signInWithRedirect, getRedirectResult, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.12.0/firebase-auth.js";
-import { getFirestore, doc, setDoc, getDoc, collection, getDocs } from "https://www.gstatic.com/firebasejs/12.12.0/firebase-firestore.js";
+import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/12.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyB0F-USdHU_KgrsahqdjqZRY8tsmr84JZo",
@@ -1172,9 +1167,7 @@ window._fb = { auth, db,
   signIn: () => signInWithRedirect(auth, provider),
   signOut: () => signOut(auth),
   saveUser: (uid, data) => setDoc(doc(db, 'users', uid, 'workspace', 'data'), data),
-  saveProfile: (uid, profile) => setDoc(doc(db, 'users', uid), profile, { merge: true }),
-  loadUser: async (uid) => { const s = await getDoc(doc(db, 'users', uid, 'workspace', 'data')); return s.exists() ? s.data() : null; },
-  getAllUsers: async () => { const s = await getDocs(collection(db, 'users')); return s.docs.map(d => ({uid: d.id, ...d.data()})); }
+  loadUser: async (uid) => { const s = await getDoc(doc(db, 'users', uid, 'workspace', 'data')); return s.exists() ? s.data() : null; }
 };
 
 getRedirectResult(auth).catch(() => {});
@@ -1687,6 +1680,15 @@ function setStatus(id, estado) {
 // ============================================================
 // PROJECT MODAL
 // ============================================================
+function autoProgreso() {
+  const est = parseFloat(document.getElementById('f-jornadas-est').value) || 0;
+  const cons = parseFloat(document.getElementById('f-jornadas-cons').value) || 0;
+  if (est > 0 && cons >= 0) {
+    const sugerido = Math.min(100, Math.round(cons / est * 100));
+    document.getElementById('f-progreso').value = sugerido;
+  }
+}
+
 function openProjectModal(id, tabIndex=0) {
   editingProjectId = id;
   const isNew = !id;
@@ -2278,12 +2280,6 @@ function onFirebaseAuth(user) {
     if (user.photoURL) { av.src = user.photoURL; av.style.display = ''; }
     else av.style.display = 'none';
     checkBackupBanner();
-    // Registrar último login
-    if (window._fb) window._fb.saveProfile(user.uid, {
-      displayName: user.displayName || '',
-      email: user.email || '',
-      lastLogin: new Date().toISOString()
-    });
     pullFromCloud(true);
   } else {
     badge.style.display = 'none';
@@ -2318,13 +2314,6 @@ async function pushToCloud() {
       Object.entries(DB).filter(([k]) => !['cloudKey','cloudBin'].includes(k))
     );
     await window._fb.saveUser(window._fbUser.uid, payload);
-    await window._fb.saveProfile(window._fbUser.uid, {
-      displayName: window._fbUser.displayName || '',
-      email: window._fbUser.email || '',
-      workspace: DB.workspace || 'Mi Área',
-      lastSaved: payload.lastSaved || null,
-      dataSize: JSON.stringify(payload).length
-    });
     const hora = new Date().toLocaleTimeString('es-ES', { hour:'2-digit', minute:'2-digit' });
     setCloudBar('ok', '☁ Guardado ' + hora);
   } catch(e) {
