@@ -2932,7 +2932,10 @@ function updateSettingsUserSection(user) {
 
 async function fbSignIn() {
   if (!window._fb) { showToast('⚠ Firebase no disponible'); return; }
-  try { await window._fb.signIn(); } catch(e) { showToast('❌ Error al iniciar sesión'); }
+  try {
+    const result = await window._fb.signIn();
+    if (result?.additionalUserInfo?.isNewUser) location.reload();
+  } catch(e) { showToast('❌ Error al iniciar sesión'); }
 }
 
 async function fbSignOut() {
