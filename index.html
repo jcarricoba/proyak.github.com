@@ -1092,6 +1092,22 @@ a { color: var(--primary); }
         <button class="btn btn-secondary btn-sm" onclick="pickWorkspaceFolder()">📂 Seleccionar carpeta...</button>
         <span id="fs-folder-name" style="font-size:11px;color:var(--muted);margin-left:8px"></span>
       </div>
+      <div class="sep"></div>
+      <div class="form-group">
+        <label class="form-label">☁ Cuenta</label>
+        <div id="set-user-info" style="display:none;align-items:center;gap:10px;background:var(--bg);border-radius:8px;padding:10px 12px;margin-bottom:10px">
+          <img id="set-user-avatar" width="32" height="32" style="border-radius:50%;flex-shrink:0;display:none">
+          <div>
+            <div id="set-user-name" style="font-size:13px;font-weight:700"></div>
+            <div id="set-cloud-label" style="font-size:11px;color:var(--muted)">Sincronizado en la nube</div>
+          </div>
+        </div>
+        <p id="set-no-user" style="display:none;font-size:11px;color:var(--muted);margin-bottom:10px;line-height:1.6">Sin sesión activa. Los datos solo se guardan en este dispositivo. Inicia sesión para sincronizar en la nube.</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-secondary btn-sm" id="set-btn-login" onclick="fbSignIn()" style="display:none">🔑 Entrar con Google</button>
+          <button class="btn btn-sm" id="set-btn-signout" onclick="fbSignOut()" style="display:none;background:rgba(248,113,113,.15);color:var(--danger);border:1px solid rgba(248,113,113,.3)">⬈ Cerrar sesión</button>
+        </div>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('settings-modal')">Cerrar</button>
@@ -2544,6 +2560,23 @@ function onFirebaseAuth(user) {
     renderAll();
     checkBackupBanner();
   }
+  updateSettingsUserSection(user);
+}
+
+function updateSettingsUserSection(user) {
+  const info = document.getElementById('set-user-info');
+  if(!info) return;
+  const loggedIn = !!user;
+  info.style.display = loggedIn ? 'flex' : 'none';
+  document.getElementById('set-no-user').style.display = loggedIn ? 'none' : 'block';
+  document.getElementById('set-btn-login').style.display = loggedIn ? 'none' : '';
+  document.getElementById('set-btn-signout').style.display = loggedIn ? '' : 'none';
+  if(loggedIn) {
+    document.getElementById('set-user-name').textContent = user.displayName || user.email;
+    const setAv = document.getElementById('set-user-avatar');
+    if(user.photoURL) { setAv.src = user.photoURL; setAv.style.display = ''; }
+    else setAv.style.display = 'none';
+  }
 }
 
 async function fbSignIn() {
@@ -2627,6 +2660,13 @@ function openSettingsModal() {
   const fsEl = document.getElementById('fs-folder-name');
   if(fsEl) fsEl.textContent = fsHandle ? '📁 '+fsHandle.name : 'No conectada';
   renderPerfilesList();
+  // Sync account section from current sidebar state
+  const badge = document.getElementById('user-badge');
+  const loggedIn = badge && badge.style.display !== 'none';
+  updateSettingsUserSection(loggedIn ? {
+    displayName: document.getElementById('user-email').textContent,
+    photoURL: (document.getElementById('user-avatar').style.display !== 'none') ? document.getElementById('user-avatar').src : null
+  } : null);
   document.getElementById('settings-modal').classList.remove('hidden');
 }
 
