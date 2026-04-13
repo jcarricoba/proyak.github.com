@@ -2941,6 +2941,10 @@ async function fbSignOut() {
 async function deleteAccount() {
   if (!window._fbUser || !window._fb) return;
   if (!confirm('¿Eliminar tu cuenta y todos tus datos? Esta acción no se puede deshacer.')) return;
+  await _doDeleteAccount();
+}
+
+async function _doDeleteAccount() {
   try {
     const user = window._fbUser;
     // 1. Borrar datos en Firestore
@@ -2953,10 +2957,9 @@ async function deleteAccount() {
     setTimeout(() => location.reload(), 1000);
   } catch(e) {
     if (e.code === 'auth/requires-recent-login') {
-      // Reautenticar y reintentar
       try {
         await window._fb.reauthenticateWithPopup(window._fbUser);
-        deleteAccount();
+        await _doDeleteAccount();
       } catch(e2) { showToast('❌ No se pudo verificar la identidad'); }
     } else {
       showToast('❌ Error al eliminar: ' + (e.code || e.message));
