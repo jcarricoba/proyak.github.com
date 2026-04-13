@@ -227,6 +227,14 @@ tr:hover .action-icons { opacity: 1; }
 .pe-reselling { border-left-color: #4ade80; }
 .pe-reselling .pc-estado { background: rgba(74,222,128,.15); color: #4ade80; }
 .pc-notas { font-size: 11px; color: var(--muted); margin-top: 6px; line-height: 1.4; }
+.pc-valor { font-size: 11px; margin-top: 5px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.pc-valor-num { color: #4ade80; font-weight: 700; }
+.pc-prob { color: var(--muted); font-size: 10px; }
+.pv-summary { display: flex; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+.pv-kpi { background: var(--surface); border-radius: 8px; padding: 10px 16px; box-shadow: var(--shadow); border-left: 3px solid var(--border); min-width: 150px; flex: 1; }
+.pv-kpi-label { font-size: 10px; color: var(--muted); text-transform: uppercase; font-weight: 700; letter-spacing: .05em; margin-bottom: 4px; }
+.pv-kpi-value { font-size: 16px; font-weight: 800; }
+.pv-kpi-value.ponderado { color: #4ade80; }
 
 /* ===== EMPTY STATE ===== */
 .empty-state { text-align: center; padding: 48px 20px; color: var(--muted); }
@@ -985,6 +993,14 @@ a { color: var(--primary); }
         <div class="form-group">
           <label class="form-label">Fecha contacto</label>
           <input type="date" class="form-input" id="pv-fecha">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Valor estimado (€)</label>
+          <input type="number" class="form-input" id="pv-valor" placeholder="0" min="0" step="100">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Probabilidad de cierre (%)</label>
+          <input type="number" class="form-input" id="pv-prob" placeholder="0" min="0" max="100" step="5">
         </div>
         <div class="form-group full">
           <label class="form-label">Notas</label>
@@ -2014,20 +2030,59 @@ function renderPreventa() {
     interes:'💡 Interés inicial', demo:'🎬 Demo / Presentación', propuesta:'📄 Propuesta enviada',
     negociacion:'🤝 Negociación', reselling:'🔄 Reselling / Ampliación', ganado:'✅ Ganados', perdido:'❌ Perdidos / Archivados'
   };
+  const ACTIVE = ['demo','propuesta','negociacion','interes','reselling'];
 
-  let html = '<div class="preventa-grid">';
+  const fmtEur = n => n.toLocaleString('es-ES',{minimumFractionDigits:0,maximumFractionDigits:0}) + ' €';
+
+  // Calculate pipeline totals (active states only)
+  let totalBruto = 0, totalPonderado = 0;
+  DB.preventa.filter(p => ACTIVE.includes(p.estado||'interes')).forEach(p => {
+    const v = +p.valor || 0;
+    totalBruto += v;
+    totalPonderado += v * (+p.prob||0) / 100;
+  });
+
+  // Summary banner
+  let html = '';
+  if(DB.preventa.some(p => ACTIVE.includes(p.estado||'interes') && (+p.valor||0) > 0)) {
+    html += `<div class="pv-summary">
+      <div class="pv-kpi">
+        <div class="pv-kpi-label">Valor bruto pipeline</div>
+        <div class="pv-kpi-value">${fmtEur(totalBruto)}</div>
+      </div>
+      <div class="pv-kpi" style="border-left-color:#4ade80">
+        <div class="pv-kpi-label">Valor ponderado</div>
+        <div class="pv-kpi-value ponderado">${fmtEur(totalPonderado)}</div>
+      </div>
+    </div>`;
+  }
+
+  html += '<div class="preventa-grid">';
   for(const estado of ORDER) {
     const items = groups[estado]||[];
     if(!items.length) continue;
-    html += `<div class="preventa-section-title">${LABELS[estado]||estado} <span style="font-size:10px;background:var(--border);padding:1px 6px;border-radius:8px">${items.length}</span></div>`;
+
+    // Section weighted total (only show if any item has a value)
+    const secBruto = items.reduce((a,p) => a + (+p.valor||0), 0);
+    const secPond = items.reduce((a,p) => a + (+p.valor||0)*(+p.prob||0)/100, 0);
+    const secValStr = secBruto > 0 ? ` <span style="font-size:10px;color:#4ade80;font-weight:700;margin-left:6px">${fmtEur(secPond)}</span>` : '';
+
+    html += `<div class="preventa-section-title">${LABELS[estado]||estado} <span style="font-size:10px;background:var(--border);padding:1px 6px;border-radius:8px">${items.length}</span>${secValStr}</div>`;
     items.forEach(p => {
       const cls = PREV_ESTADOS[p.estado]?.cls || '';
       const canConvert = !['ganado','perdido'].includes(p.estado);
+      const valor = +p.valor || 0;
+      const prob = +p.prob || 0;
+      const ponderado = valor * prob / 100;
+      const valorHtml = valor > 0
+        ? `<div class="pc-valor"><span class="pc-valor-num">${fmtEur(valor)}</span><span class="pc-prob">${prob}% → <strong>${fmtEur(ponderado)}</strong></span></div>`
+        : '';
       html += `<div class="preventa-card ${cls}" onclick="openPreventaModal('${p.id}')">
         <div class="pc-empresa">${escH(p.empresa)}</div>
         <div class="pc-herr">${escH(p.herramienta||'–')}</div>
         ${p.area?`<span class="area-tag" style="margin-top:4px;display:inline-block">${escH(p.area)}</span>`:''}
         ${p.contacto?`<div style="font-size:11px;color:var(--muted);margin-top:4px">👤 ${escH(p.contacto)}</div>`:''}
+        ${valorHtml}
         ${p.notas?`<div class="pc-notas">${escH(p.notas.substring(0,80)+(p.notas.length>80?'…':''))}</div>`:''}
         ${canConvert?`<div style="margin-top:8px;display:flex;justify-content:flex-end"><button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();openConvModal('${p.id}')" style="font-size:10px;padding:3px 8px">＋ Crear proyecto</button></div>`:''}
       </div>`;
@@ -2049,6 +2104,8 @@ function openPreventaModal(id) {
   document.getElementById('pv-area').value = p?.area||'';
   document.getElementById('pv-contacto').value = p?.contacto||'';
   document.getElementById('pv-fecha').value = p?.fecha||'';
+  document.getElementById('pv-valor').value = p?.valor||'';
+  document.getElementById('pv-prob').value = p?.prob||'';
   document.getElementById('pv-notas').value = p?.notas||'';
   document.getElementById('prev-modal').classList.remove('hidden');
 }
@@ -2063,6 +2120,8 @@ function savePreventa() {
     area: document.getElementById('pv-area').value.trim(),
     contacto: document.getElementById('pv-contacto').value.trim(),
     fecha: document.getElementById('pv-fecha').value,
+    valor: parseFloat(document.getElementById('pv-valor').value)||0,
+    prob: parseInt(document.getElementById('pv-prob').value)||0,
     notas: document.getElementById('pv-notas').value
   };
   if(editingPreventaId) {
