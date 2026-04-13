@@ -1233,6 +1233,7 @@ a { color: var(--primary); }
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn btn-secondary btn-sm" id="set-btn-login" onclick="fbSignIn()" style="display:none">🔑 Entrar con Google</button>
           <button class="btn btn-sm" id="set-btn-signout" onclick="fbSignOut()" style="display:none;background:rgba(248,113,113,.15);color:var(--danger);border:1px solid rgba(248,113,113,.3)">⬈ Cerrar sesión</button>
+          <button class="btn btn-sm" id="set-btn-delete-account" onclick="deleteAccount()" style="display:none;background:rgba(248,113,113,.08);color:var(--danger);border:1px solid rgba(248,113,113,.2)">🗑 Eliminar cuenta y datos</button>
         </div>
       </div>
     </div>
@@ -1422,8 +1423,8 @@ a { color: var(--primary); }
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.12.0/firebase-app.js";
-import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.12.0/firebase-auth.js";
-import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/12.12.0/firebase-firestore.js";
+import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged, deleteUser, reauthenticateWithPopup } from "https://www.gstatic.com/firebasejs/12.12.0/firebase-auth.js";
+import { getFirestore, doc, setDoc, getDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/12.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyB0F-USdHU_KgrsahqdjqZRY8tsmr84JZo",
@@ -2922,6 +2923,7 @@ function updateSettingsUserSection(user) {
   document.getElementById('set-no-user').style.display = loggedIn ? 'none' : 'block';
   document.getElementById('set-btn-login').style.display = loggedIn ? 'none' : '';
   document.getElementById('set-btn-signout').style.display = loggedIn ? '' : 'none';
+  document.getElementById('set-btn-delete-account').style.display = loggedIn ? '' : 'none';
   if(loggedIn) {
     document.getElementById('set-user-name').textContent = user.displayName || user.email;
     const setAv = document.getElementById('set-user-avatar');
@@ -2942,6 +2944,32 @@ async function fbSignOut() {
   if (!window._fb) return;
   await window._fb.signOut();
   showToast('Sesión cerrada');
+}
+
+async function deleteAccount() {
+  if (!window._fbUser || !window._fb) return;
+  if (!confirm('¿Eliminar tu cuenta y todos tus datos? Esta acción no se puede deshacer.')) return;
+  try {
+    const user = window._fbUser;
+    // 1. Borrar datos en Firestore
+    await deleteDoc(doc(db, 'users', user.uid, 'workspace', 'data'));
+    // 2. Borrar cuenta en Firebase Auth (requiere sesión reciente)
+    await deleteUser(user);
+    // 3. Limpiar local
+    localStorage.removeItem('proyak_v1');
+    showToast('Cuenta eliminada');
+    setTimeout(() => location.reload(), 1000);
+  } catch(e) {
+    if (e.code === 'auth/requires-recent-login') {
+      // Reautenticar y reintentar
+      try {
+        await reauthenticateWithPopup(window._fbUser, new GoogleAuthProvider());
+        deleteAccount();
+      } catch(e2) { showToast('❌ No se pudo verificar la identidad'); }
+    } else {
+      showToast('❌ Error al eliminar: ' + (e.code || e.message));
+    }
+  }
 }
 
 async function pushToCloud() {
