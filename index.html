@@ -3340,6 +3340,7 @@ function toggleSidebar() {
 // BOOT
 // ============================================================
 document.getElementById('version-label').textContent = 'v' + VERSION + ' · ' + VERSION_DATE;
+document.getElementById('version-label').title = '© 2026 Jacobo Carricoba González. Todos los derechos reservados.';
 loadData();
 renderAll();
 if (localStorage.getItem('proyak_sidebar') === '1') {
