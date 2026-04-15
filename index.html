@@ -2929,7 +2929,6 @@ function updateSettingsUserSection(user) {
 
 async function fbSignIn() {
   if (!window._fb) { showToast('⚠ Firebase no disponible'); return; }
-  // signInWithRedirect navigates away; result is handled by getRedirectResult on page load
   try {
     const result = await window._fb.signIn();
     if (result?.additionalUserInfo?.isNewUser) location.reload();
